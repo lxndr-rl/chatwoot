@@ -167,9 +167,9 @@ describe Whatsapp::IncomingMessageServiceHelpers do
       expect(service.unprocessable_message_type?('request_welcome')).to be true
     end
 
-    it 'returns false for reaction messages (now handled separately)' do
+    it 'returns true for reaction messages' do
       service = test_class.new(inbox: inbox)
-      expect(service.unprocessable_message_type?('reaction')).to be false
+      expect(service.unprocessable_message_type?('reaction')).to be true
     end
 
     it 'returns false for text messages' do
