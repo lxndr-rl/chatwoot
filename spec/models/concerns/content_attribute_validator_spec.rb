@@ -36,6 +36,20 @@ describe ContentAttributeValidator do
     end
   end
 
+  context 'when a card action has no type' do
+    it 'is invalid' do
+      message = build_card_message(
+        [
+          { title: 'Card 1', actions: [{ text: 'Buy', payload: 'buy' }] },
+          { title: 'Card 2', actions: [{ type: 'reply', text: 'Go', payload: 'p2' }] }
+        ]
+      )
+
+      expect(message).to be_invalid
+      expect(message.errors[:content_attributes]).to include('contains card actions missing type')
+    end
+  end
+
   context 'when a WhatsApp carousel item uses the postback/link legacy aliases and has no title' do
     it 'is invalid' do
       message = build_card_message(

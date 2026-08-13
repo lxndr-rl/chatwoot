@@ -172,10 +172,23 @@ class ContentAttributeValidator < ActiveModel::Validator # rubocop:disable Metri
     return if item[:actions].blank?
 
     action_types = item[:actions].pluck(:type).compact.uniq
-    return if action_types.blank?
+    return if reject_missing_card_action_types!(record, action_types)
     return if reject_unsupported_card_action_types!(record, action_types)
 
     route_interactive_card_action_validation!(record, item[:actions], action_types)
+  end
+
+  # A present-but-untyped action (e.g. { text: 'Buy', payload: 'buy' }) leaves
+  # action_types empty after compacting, which previously made the check below
+  # return early as if there were no actions at all, silently accepting an
+  # action the send services can't serialize (Facebook/Instagram templates
+  # only recognize named types; WhatsApp doesn't even detect the message as
+  # an interactive carousel and falls through to a plain text send).
+  def reject_missing_card_action_types!(record, action_types)
+    return false if action_types.present?
+
+    record.errors.add(:content_attributes, 'contains card actions missing type')
+    true
   end
 
   def reject_unsupported_card_action_types!(record, action_types)
