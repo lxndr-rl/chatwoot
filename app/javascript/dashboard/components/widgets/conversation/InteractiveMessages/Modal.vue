@@ -185,6 +185,10 @@ const isCardsValid = computed(
         // WhatsApp interactive media carousels require every card to have media.
         (!props.allowListType || !!card.mediaUrl)
     ) &&
+    // WhatsApp requires the same action type across every card in the carousel.
+    (!props.allowListType ||
+      new Set(carouselForm.value.cards.map(card => card.actionType)).size <=
+        1) &&
     isCardsMediaValid.value
 );
 
