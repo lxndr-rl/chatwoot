@@ -286,6 +286,36 @@ describe Facebook::SendOnFacebookService do
       end
     end
 
+    context 'with cta_url content type and an attachment where the attachment succeeds but the template fails' do
+      it 'does not resend the attachment on retry and stays retryable' do
+        error_json = { error: { message: 'Temporary error', code: 1 } }.to_json
+        attachment_success_json = { recipient_id: '1008372609250235', message_id: 'mid.attachment' }.to_json
+        template_success_json = { recipient_id: '1008372609250235', message_id: 'mid.template' }.to_json
+        allow(bot).to receive(:deliver).and_return(attachment_success_json, error_json, template_success_json)
+
+        message = build(:message, message_type: 'outgoing', inbox: facebook_inbox, account: account, conversation: conversation,
+                                  content_type: 'cta_url',
+                                  content_attributes: {
+                                    'body_text' => 'Check our website',
+                                    'action' => { 'text' => 'Visit', 'uri' => 'https://example.com' }
+                                  })
+        attachment = message.attachments.new(account_id: message.account_id, file_type: :image)
+        attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
+        message.save!
+        allow(attachment).to receive(:download_url).and_return('url1')
+
+        described_class.new(message: message).perform
+        expect(bot).to have_received(:deliver).twice
+        expect(message.reload.status).to eq('failed')
+        expect(message.source_id).to be_nil
+
+        described_class.new(message: message).perform
+
+        expect(bot).to have_received(:deliver).exactly(3).times
+        expect(message.reload.source_id).to eq('mid.template')
+      end
+    end
+
     context 'with cards intro text where the cards template send fails and is retried' do
       it 'does not resend the intro text that already succeeded' do
         success_json = { recipient_id: '1008372609250235', message_id: 'mid.intro' }.to_json

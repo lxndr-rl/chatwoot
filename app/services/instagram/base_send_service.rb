@@ -25,10 +25,26 @@ class Instagram::BaseSendService < Base::SendOnChannelService # rubocop:disable 
     handle_error(e)
   end
 
+  # Don't let an attachment set source_id (would make the base service treat the
+  # message as "already sent" and skip a Retry before the remaining content ever
+  # gets a chance to send), and track which attachments already succeeded so a
+  # Retry doesn't resend them.
   def send_attachments
     message.attachments.each do |attachment|
-      send_message(attachment_message_params(attachment))
+      next if attachment_already_sent?(attachment)
+
+      mark_attachment_sent(attachment) if send_message(attachment_message_params(attachment), update_source_id: false)
     end
+  end
+
+  def attachment_already_sent?(attachment)
+    Array(message.content_attributes['sent_attachment_ids']).include?(attachment.id)
+  end
+
+  def mark_attachment_sent(attachment)
+    sent_ids = Array(message.content_attributes['sent_attachment_ids'])
+    message.content_attributes['sent_attachment_ids'] = (sent_ids + [attachment.id]).uniq
+    message.save!
   end
 
   def send_content

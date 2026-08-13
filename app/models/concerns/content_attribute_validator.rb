@@ -2,7 +2,12 @@ class ContentAttributeValidator < ActiveModel::Validator # rubocop:disable Metri
   ALLOWED_SELECT_ITEM_KEYS = [:title, :value].freeze
   ALLOWED_CARD_ITEM_KEYS = [:title, :description, :media_url, :actions].freeze
   ALLOWED_CARD_ITEM_ACTION_KEYS = [:text, :type, :payload, :uri].freeze
-  ALLOWED_PROVIDER_ERROR_KEYS = [:external_error].freeze
+  # Bookkeeping keys providers/services write onto content_attributes outside
+  # of the user-authored payload (delivery errors, per-part retry tracking).
+  ALLOWED_PROVIDER_ERROR_KEYS = [
+    :external_error, :sent_attachment_ids, :generic_template_intro_sent, :generic_template_cards_sent,
+    :additional_source_ids
+  ].freeze
   ALLOWED_CTA_URL_KEYS = [:body_text, :footer_text, :header, :action].concat(ALLOWED_PROVIDER_ERROR_KEYS).freeze
   ALLOWED_CTA_URL_HEADER_KEYS = [:type, :media_url].freeze
   ALLOWED_CTA_URL_ACTION_KEYS = [:text, :uri].freeze

@@ -276,6 +276,41 @@ describe Instagram::SendOnInstagramService do
         end
       end
 
+      context 'with cta_url content type and an attachment where the attachment succeeds but the template fails' do
+        it 'does not resend the attachment on retry and stays retryable' do
+          allow(HTTParty).to receive(:post).and_return(
+            instance_double(HTTParty::Response, success?: true, body: { message_id: 'mid_attachment' }.to_json,
+                                                parsed_response: { 'message_id' => 'mid_attachment' }),
+            instance_double(HTTParty::Response, success?: true,
+                                                body: { error: { message: 'Temporary error', code: 1 } }.to_json,
+                                                parsed_response: { 'error' => { 'message' => 'Temporary error', 'code' => 1 } }),
+            instance_double(HTTParty::Response, success?: true, body: { message_id: 'mid_template' }.to_json,
+                                                parsed_response: { 'message_id' => 'mid_template' })
+          )
+
+          message = build(:message, message_type: 'outgoing', inbox: instagram_inbox, account: account, conversation: conversation,
+                                    content_type: 'cta_url',
+                                    content_attributes: {
+                                      'body_text' => 'Check our website',
+                                      'action' => { 'text' => 'Visit', 'uri' => 'https://example.com' }
+                                    })
+          attachment = message.attachments.new(account_id: message.account_id, file_type: :image)
+          attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
+          message.save!
+          allow(attachment).to receive(:download_url).and_return('url1')
+
+          described_class.new(message: message).perform
+          expect(HTTParty).to have_received(:post).twice
+          expect(message.reload.status).to eq('failed')
+          expect(message.source_id).to be_nil
+
+          described_class.new(message: message).perform
+
+          expect(HTTParty).to have_received(:post).exactly(3).times
+          expect(message.reload.source_id).to eq('mid_template')
+        end
+      end
+
       context 'with cards intro text where the intro send fails and the cards send would succeed' do
         it 'stops before sending the cards template and stays retryable' do
           allow(HTTParty).to receive(:post).and_return(
