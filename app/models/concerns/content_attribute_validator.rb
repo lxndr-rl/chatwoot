@@ -310,6 +310,8 @@ class ContentAttributeValidator < ActiveModel::Validator # rubocop:disable Metri
   end
 
   def validate_interactive_list_attributes!(record)
+    return if reject_interactive_list_unsupported_target!(record)
+
     content_attributes = ensure_indifferent_access(record.content_attributes)
     invalid_keys = content_attributes.keys.map(&:to_sym) - ALLOWED_INTERACTIVE_LIST_KEYS
     record.errors.add(:content_attributes, "contains invalid keys for interactive_list: #{invalid_keys}") if invalid_keys.present?
@@ -319,6 +321,17 @@ class ContentAttributeValidator < ActiveModel::Validator # rubocop:disable Metri
     validate_interactive_list_header!(record, content_attributes[:header])
     validate_interactive_list_action!(record, content_attributes[:action])
     validate_interactive_list_sections!(record, content_attributes[:sections])
+  end
+
+  # Neither Facebook::SendOnFacebookService nor Instagram::BaseSendService has an
+  # interactive_list branch, so a list message on those channels would silently
+  # fall through to a plain text send while the stored action/sections/rows are
+  # never delivered. WhatsApp and non-Meta (website/API) inboxes are unaffected.
+  def reject_interactive_list_unsupported_target!(record)
+    return false unless record.inbox&.facebook? || record.inbox&.instagram_direct?
+
+    record.errors.add(:content_attributes, 'interactive_list is not supported for this inbox')
+    true
   end
 
   def validate_interactive_buttons_attributes!(record)

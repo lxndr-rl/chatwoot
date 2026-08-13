@@ -212,4 +212,42 @@ describe ContentAttributeValidator do
       expect(message).to be_valid
     end
   end
+
+  context 'when an interactive_list targets a Facebook inbox' do
+    it 'is invalid' do
+      allow(Facebook::Messenger::Subscriptions).to receive(:subscribe).and_return(true)
+      facebook_channel = create(:channel_facebook_page, account: account)
+      facebook_inbox = create(:inbox, channel: facebook_channel, account: account)
+      facebook_conversation = create(:conversation, account: account, inbox: facebook_inbox)
+
+      message = build(:message, conversation: facebook_conversation, account: account, inbox: facebook_inbox,
+                                message_type: :outgoing, content_type: 'interactive_list',
+                                content_attributes: {
+                                  body_text: 'Pick an item',
+                                  action: { button_text: 'View options' },
+                                  sections: [{ title: 'Section 1', rows: [{ id: 'row_1', title: 'Row 1' }] }]
+                                })
+
+      expect(message).to be_invalid
+      expect(message.errors[:content_attributes]).to include('interactive_list is not supported for this inbox')
+    end
+  end
+
+  context 'when an interactive_list targets a website inbox' do
+    it 'is valid' do
+      widget_channel = create(:channel_widget, account: account)
+      widget_inbox = create(:inbox, channel: widget_channel, account: account)
+      widget_conversation = create(:conversation, account: account, inbox: widget_inbox)
+
+      message = build(:message, conversation: widget_conversation, account: account, inbox: widget_inbox,
+                                message_type: :outgoing, content_type: 'interactive_list',
+                                content_attributes: {
+                                  body_text: 'Pick an item',
+                                  action: { button_text: 'View options' },
+                                  sections: [{ title: 'Section 1', rows: [{ id: 'row_1', title: 'Row 1' }] }]
+                                })
+
+      expect(message).to be_valid
+    end
+  end
 end
